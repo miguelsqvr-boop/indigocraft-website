@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Desmos Academy — Learn Math Visually</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://www.desmos.com/api/v1.9/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SPLASH SCREEN
+════════════════════════════════════════════════════════════ -->
+<div id="splash" class="screen active">
+  <div class="splash-bg">
+    <canvas id="splash-canvas"></canvas>
+  </div>
+  <div class="splash-content">
+    <div class="logo-wrap">
+      <span class="logo-icon">∫</span>
+      <h1 class="logo-text">Desmos<span class="accent">Academy</span></h1>
+    </div>
+    <p class="tagline">Master the world's most beautiful graphing calculator.<br>One lesson at a time.</p>
+    <div class="progress-overview" id="progress-overview"></div>
+    <button class="btn-primary" id="start-btn">Start Learning →</button>
+    <p class="sub-hint">7 lessons · hands-on · totally free</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LESSON SCREEN
+════════════════════════════════════════════════════════════ -->
+<div id="lesson-screen" class="screen">
+
+  <!-- Top nav -->
+  <nav class="top-nav">
+    <button class="nav-back" id="back-btn">← Back</button>
+    <div class="lesson-breadcrumb" id="lesson-breadcrumb"></div>
+    <div class="xp-badge" id="xp-badge">⭐ 0 XP</div>
+  </nav>
+
+  <!-- Progress bar -->
+  <div class="global-progress-bar">
+    <div class="global-progress-fill" id="global-progress-fill"></div>
+  </div>
+
+  <!-- Lesson header -->
+  <header class="lesson-header" id="lesson-header">
+    <div class="lesson-number" id="lesson-number"></div>
+    <h2 class="lesson-title" id="lesson-title"></h2>
+    <p class="lesson-subtitle" id="lesson-subtitle"></p>
+  </header>
+
+  <!-- Main content grid -->
+  <div class="lesson-grid">
+    <!-- Left: instruction panel -->
+    <aside class="instruction-panel" id="instruction-panel">
+      <div class="step-tabs" id="step-tabs"></div>
+      <div class="step-content" id="step-content"></div>
+      <div class="step-actions" id="step-actions"></div>
+    </aside>
+
+    <!-- Right: Desmos calculator -->
+    <div class="calc-container">
+      <div class="calc-label" id="calc-label">Desmos Calculator</div>
+      <div id="calculator"></div>
+      <div class="calc-hint" id="calc-hint"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     QUIZ MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="quiz-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-emoji" id="quiz-emoji">🤔</div>
+    <h3 id="quiz-question"></h3>
+    <div class="quiz-options" id="quiz-options"></div>
+    <div class="quiz-feedback hidden" id="quiz-feedback"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CELEBRATION MODAL
+════════════════════════════════════════════════════════════ -->
+<div id="celebrate-modal" class="modal-overlay hidden">
+  <div class="modal-card celebrate-card">
+    <canvas id="confetti-canvas"></canvas>
+    <div class="celebrate-icon" id="celebrate-icon">🎉</div>
+    <h3 id="celebrate-title">Lesson Complete!</h3>
+    <p id="celebrate-msg"></p>
+    <div class="xp-earned" id="xp-earned"></div>
+    <button class="btn-primary" id="celebrate-next">Next Lesson →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     GRADUATION SCREEN
+════════════════════════════════════════════════════════════ -->
+<div id="grad-screen" class="screen hidden">
+  <canvas id="grad-confetti"></canvas>
+  <div class="grad-content">
+    <div class="grad-trophy">🏆</div>
+    <h1>You did it!</h1>
+    <p class="grad-sub">You've completed all 7 Desmos lessons.</p>
+    <div class="grad-stats" id="grad-stats"></div>
+    <p class="grad-cta">Now go build something <em>beautiful</em> with Desmos.</p>
+    <a href="https://www.desmos.com/calculator" target="_blank" class="btn-primary">Open Desmos →</a>
+    <button class="btn-secondary" id="restart-btn">Start Over</button>
+  </div>
+</div>
+
+<script src="lessons.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
