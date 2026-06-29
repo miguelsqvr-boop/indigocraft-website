@@ -129,34 +129,56 @@
   // ─────────────────────────────────────────────
   // CALCULATOR
   // ─────────────────────────────────────────────
+  function desmosReady() {
+    return typeof Desmos !== 'undefined' && Desmos.GraphingCalculator;
+  }
+
   function initCalc() {
-    if (calc) { calc.destroy(); calc = null; }
-    calc = Desmos.GraphingCalculator(el('calculator'), {
-      expressions:       true,
-      settingsMenu:      true,
-      zoomButtons:       true,
-      expressionsTopbar: true,
-      border:            false,
-      language:          'en',
-    });
-    calc.updateSettings({ backgroundColor: '#08090f' });
+    if (!desmosReady()) { showCalcOffline(); return; }
+    if (calc) { try { calc.destroy(); } catch(_) {} calc = null; }
+    try {
+      calc = Desmos.GraphingCalculator(el('calculator'), {
+        expressions:       true,
+        settingsMenu:      true,
+        zoomButtons:       true,
+        expressionsTopbar: true,
+        border:            false,
+        language:          'en',
+      });
+      calc.updateSettings({ backgroundColor: '#08090f' });
+    } catch(e) { showCalcOffline(); }
   }
 
   function loadCalc(lesson) {
-    calc.setBlank();
-    (lesson.initExprs || []).forEach(e => calc.setExpression(e));
-    calc.setMathBounds({ left:-7, right:7, bottom:-5, top:5 });
+    if (!calc || !desmosReady()) { showCalcOffline(); return; }
+    try {
+      calc.setBlank();
+      (lesson.initExprs || []).forEach(e => calc.setExpression(e));
+      calc.setMathBounds({ left:-7, right:7, bottom:-5, top:5 });
+    } catch(e) { showCalcOffline(); }
+  }
+
+  function showCalcOffline() {
+    el('calculator').innerHTML = `
+      <div class="calc-offline">
+        <div class="co-icon">📡</div>
+        <h3>Desmos requires internet</h3>
+        <p>The live calculator loads from desmos.com. Open this app in a browser with internet access, or go directly to:</p>
+        <a href="https://www.desmos.com/calculator" target="_blank">desmos.com/calculator →</a>
+        <p style="margin-top:1rem; font-size:.8rem">All lessons, quizzes, and progress tracking work offline.</p>
+      </div>`;
   }
 
   // ─────────────────────────────────────────────
   // LESSON RENDERING
   // ─────────────────────────────────────────────
   function openLesson(idx) {
-    S.lesson     = idx;
-    S.step       = 0;
-    S.quizDone   = false;
+    S.lesson   = idx;
+    S.step     = 0;
+    S.quizDone = false;
     showScreen('lesson');
-    loadCalc(LESSONS[idx]);
+    // Attempt to init/load calc — safe if Desmos hasn't loaded yet
+    try { initCalc(); loadCalc(LESSONS[idx]); } catch(e) { showCalcOffline(); }
     renderLesson();
   }
 
@@ -373,7 +395,6 @@
     showScreen('splash');
     renderSplash();
     initBg();
-    initCalc();
 
     el('btn-start').addEventListener('click', () => openLesson(nextIncomplete()));
 
