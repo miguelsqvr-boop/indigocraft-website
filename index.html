@@ -1,114 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Desmos Academy — Learn Math Visually</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Desmos Academy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
   <script src="https://www.desmos.com/api/v1.9/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════
-     SPLASH SCREEN
-════════════════════════════════════════════════════════════ -->
-<div id="splash" class="screen active">
-  <div class="splash-bg">
-    <canvas id="splash-canvas"></canvas>
-  </div>
-  <div class="splash-content">
-    <div class="logo-wrap">
-      <span class="logo-icon">∫</span>
-      <h1 class="logo-text">Desmos<span class="accent">Academy</span></h1>
-    </div>
-    <p class="tagline">Master the world's most beautiful graphing calculator.<br>One lesson at a time.</p>
-    <div class="progress-overview" id="progress-overview"></div>
-    <button class="btn-primary" id="start-btn">Start Learning →</button>
-    <p class="sub-hint">7 lessons · hands-on · totally free</p>
+<!-- ░░░░░░ SPLASH ░░░░░░ -->
+<div id="screen-splash" class="screen active">
+  <canvas id="bg-canvas"></canvas>
+  <div class="splash-inner">
+    <div class="splash-badge">FREE · INTERACTIVE · FUN</div>
+    <h1 class="splash-title">Desmos<br><span>Academy</span></h1>
+    <p class="splash-sub">Master the world's most powerful<br>free graphing calculator — step by step.</p>
+
+    <div class="lesson-map" id="lesson-map"></div>
+
+    <button class="cta" id="btn-start">
+      <span id="cta-label">Begin Journey</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+    <p class="splash-meta" id="splash-meta">7 lessons · 28 steps · free forever</p>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     LESSON SCREEN
-════════════════════════════════════════════════════════════ -->
-<div id="lesson-screen" class="screen">
-
-  <!-- Top nav -->
-  <nav class="top-nav">
-    <button class="nav-back" id="back-btn">← Back</button>
-    <div class="lesson-breadcrumb" id="lesson-breadcrumb"></div>
-    <div class="xp-badge" id="xp-badge">⭐ 0 XP</div>
-  </nav>
-
-  <!-- Progress bar -->
-  <div class="global-progress-bar">
-    <div class="global-progress-fill" id="global-progress-fill"></div>
+<!-- ░░░░░░ LESSON ░░░░░░ -->
+<div id="screen-lesson" class="screen">
+  <!-- Top bar -->
+  <div class="topbar">
+    <button class="topbar-back" id="btn-back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Menu
+    </button>
+    <div class="topbar-center">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+    <div class="topbar-xp" id="topbar-xp">⭐ 0</div>
   </div>
 
-  <!-- Lesson header -->
-  <header class="lesson-header" id="lesson-header">
-    <div class="lesson-number" id="lesson-number"></div>
-    <h2 class="lesson-title" id="lesson-title"></h2>
-    <p class="lesson-subtitle" id="lesson-subtitle"></p>
-  </header>
+  <!-- Body -->
+  <div class="lesson-body">
+    <!-- Panel -->
+    <div class="panel" id="panel">
+      <div class="panel-header" id="panel-header">
+        <div class="lesson-tag" id="lesson-tag"></div>
+        <h2 id="lesson-title"></h2>
+        <p id="lesson-sub"></p>
+      </div>
 
-  <!-- Main content grid -->
-  <div class="lesson-grid">
-    <!-- Left: instruction panel -->
-    <aside class="instruction-panel" id="instruction-panel">
-      <div class="step-tabs" id="step-tabs"></div>
-      <div class="step-content" id="step-content"></div>
-      <div class="step-actions" id="step-actions"></div>
-    </aside>
+      <div class="step-nav" id="step-nav"></div>
 
-    <!-- Right: Desmos calculator -->
-    <div class="calc-container">
-      <div class="calc-label" id="calc-label">Desmos Calculator</div>
+      <div class="panel-content" id="panel-content"></div>
+
+      <div class="panel-footer" id="panel-footer"></div>
+    </div>
+
+    <!-- Calc -->
+    <div class="calc-wrap">
+      <div class="calc-topbar">
+        <div class="calc-title" id="calc-title">Desmos Calculator</div>
+        <a href="https://desmos.com/calculator" target="_blank" class="calc-open-btn">Open full ↗</a>
+      </div>
       <div id="calculator"></div>
-      <div class="calc-hint" id="calc-hint"></div>
+      <div class="calc-footer" id="calc-footer"></div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     QUIZ MODAL
-════════════════════════════════════════════════════════════ -->
-<div id="quiz-modal" class="modal-overlay hidden">
-  <div class="modal-card">
-    <div class="modal-emoji" id="quiz-emoji">🤔</div>
-    <h3 id="quiz-question"></h3>
-    <div class="quiz-options" id="quiz-options"></div>
-    <div class="quiz-feedback hidden" id="quiz-feedback"></div>
+<!-- ░░░░░░ QUIZ OVERLAY ░░░░░░ -->
+<div id="overlay-quiz" class="overlay hidden">
+  <div class="card quiz-card">
+    <div class="quiz-emo" id="quiz-emo"></div>
+    <p class="quiz-q" id="quiz-q"></p>
+    <div class="quiz-opts" id="quiz-opts"></div>
+    <div class="quiz-fb hidden" id="quiz-fb"></div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     CELEBRATION MODAL
-════════════════════════════════════════════════════════════ -->
-<div id="celebrate-modal" class="modal-overlay hidden">
-  <div class="modal-card celebrate-card">
-    <canvas id="confetti-canvas"></canvas>
-    <div class="celebrate-icon" id="celebrate-icon">🎉</div>
-    <h3 id="celebrate-title">Lesson Complete!</h3>
-    <p id="celebrate-msg"></p>
-    <div class="xp-earned" id="xp-earned"></div>
-    <button class="btn-primary" id="celebrate-next">Next Lesson →</button>
+<!-- ░░░░░░ WIN OVERLAY ░░░░░░ -->
+<div id="overlay-win" class="overlay hidden">
+  <canvas id="win-canvas"></canvas>
+  <div class="card win-card">
+    <div class="win-icon" id="win-icon"></div>
+    <h3 id="win-title"></h3>
+    <p id="win-msg"></p>
+    <div class="win-xp" id="win-xp"></div>
+    <button class="cta" id="btn-next">Next Lesson →</button>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     GRADUATION SCREEN
-════════════════════════════════════════════════════════════ -->
-<div id="grad-screen" class="screen hidden">
-  <canvas id="grad-confetti"></canvas>
-  <div class="grad-content">
+<!-- ░░░░░░ GRAD ░░░░░░ -->
+<div id="screen-grad" class="screen hidden">
+  <canvas id="grad-canvas"></canvas>
+  <div class="grad-inner">
     <div class="grad-trophy">🏆</div>
-    <h1>You did it!</h1>
-    <p class="grad-sub">You've completed all 7 Desmos lessons.</p>
-    <div class="grad-stats" id="grad-stats"></div>
-    <p class="grad-cta">Now go build something <em>beautiful</em> with Desmos.</p>
-    <a href="https://www.desmos.com/calculator" target="_blank" class="btn-primary">Open Desmos →</a>
-    <button class="btn-secondary" id="restart-btn">Start Over</button>
+    <h1>Course Complete!</h1>
+    <p class="grad-sub">You've mastered all 7 Desmos lessons.</p>
+    <div class="grad-pills" id="grad-pills"></div>
+    <a href="https://www.desmos.com/calculator" target="_blank" class="cta">Open Desmos →</a>
+    <button class="ghost-btn" id="btn-restart">Restart</button>
   </div>
 </div>
 

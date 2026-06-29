@@ -1,466 +1,391 @@
-// ═══════════════════════════════════════════════════════════════
-//  DESMOS ACADEMY — APP ENGINE
-// ═══════════════════════════════════════════════════════════════
-
+/* ═══════════════════════════════════════════════
+   DESMOS ACADEMY — APP ENGINE
+═══════════════════════════════════════════════ */
 (function () {
   'use strict';
 
-  // ─── State ───────────────────────────────────────────────────
-  const state = {
-    currentLesson: 0,    // index into LESSONS
-    currentStep:   0,    // index into lesson.steps
-    xp:            0,
-    completedLessons: new Set(),
-    quizAnswered:  false,
+  // ── State ────────────────────────────────────
+  const S = {
+    lesson:    0,
+    step:      0,
+    xp:        0,
+    done:      new Set(),
+    quizDone:  false,
   };
 
-  // ─── Desmos calc instance ─────────────────────────────────────
+  // ── DOM ──────────────────────────────────────
+  const el = id => document.getElementById(id);
+
+  const screens = {
+    splash:  el('screen-splash'),
+    lesson:  el('screen-lesson'),
+    grad:    el('screen-grad'),
+  };
+
+  // ── Desmos instance ──────────────────────────
   let calc = null;
 
-  // ─── DOM refs ─────────────────────────────────────────────────
-  const $ = id => document.getElementById(id);
-
-  const splash         = $('splash');
-  const lessonScreen   = $('lesson-screen');
-  const gradScreen     = $('grad-screen');
-  const startBtn       = $('start-btn');
-  const backBtn        = $('back-btn');
-  const lessonTitle    = $('lesson-title');
-  const lessonSubtitle = $('lesson-subtitle');
-  const lessonNumber   = $('lesson-number');
-  const lessonBread    = $('lesson-breadcrumb');
-  const stepTabs       = $('step-tabs');
-  const stepContent    = $('step-content');
-  const stepActions    = $('step-actions');
-  const calcHintEl     = $('calc-hint');
-  const calcLabelEl    = $('calc-label');
-  const xpBadge        = $('xp-badge');
-  const progressFill   = $('global-progress-fill');
-  const progOverview   = $('progress-overview');
-  const quizModal      = $('quiz-modal');
-  const quizEmoji      = $('quiz-emoji');
-  const quizQuestion   = $('quiz-question');
-  const quizOptions    = $('quiz-options');
-  const quizFeedback   = $('quiz-feedback');
-  const celebModal     = $('celebrate-modal');
-  const celebIcon      = $('celebrate-icon');
-  const celebTitle     = $('celebrate-title');
-  const celebMsg       = $('celebrate-msg');
-  const xpEarned       = $('xp-earned');
-  const celebNext      = $('celebrate-next');
-  const restartBtn     = $('restart-btn');
-
-  // ─── Persistence ─────────────────────────────────────────────
-  function saveState() {
-    localStorage.setItem('desmosAcademy', JSON.stringify({
-      xp:               state.xp,
-      completedLessons: [...state.completedLessons],
-      currentLesson:    state.currentLesson
+  // ─────────────────────────────────────────────
+  // PERSISTENCE
+  // ─────────────────────────────────────────────
+  function save() {
+    localStorage.setItem('da3', JSON.stringify({
+      xp:     S.xp,
+      done:   [...S.done],
+      lesson: S.lesson,
     }));
   }
 
-  function loadState() {
+  function load() {
     try {
-      const raw = localStorage.getItem('desmosAcademy');
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      state.xp               = saved.xp || 0;
-      state.completedLessons = new Set(saved.completedLessons || []);
-      state.currentLesson    = saved.currentLesson || 0;
+      const d = JSON.parse(localStorage.getItem('da3') || '{}');
+      S.xp     = d.xp     || 0;
+      S.done   = new Set(d.done   || []);
+      S.lesson = d.lesson || 0;
     } catch (_) {}
   }
 
-  // ─── Splash ───────────────────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // SCREEN MANAGEMENT
+  // ─────────────────────────────────────────────
+  function showScreen(name) {
+    Object.entries(screens).forEach(([k, v]) => {
+      v.classList.toggle('active',  k === name);
+      v.classList.toggle('hidden',  k !== name);
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // SPLASH
+  // ─────────────────────────────────────────────
   function renderSplash() {
-    // Progress pips
-    progOverview.innerHTML = LESSONS.map((l, i) => {
-      const done    = state.completedLessons.has(i);
-      const current = i === state.currentLesson && !done;
-      const cls     = done ? 'done' : current ? 'current' : '';
-      return `<div class="prog-pip ${cls}" title="${l.title}">${done ? '✓' : i + 1}</div>`;
+    // Lesson map
+    const map = el('lesson-map');
+    map.innerHTML = LESSONS.map((L, i) => {
+      const done    = S.done.has(i);
+      const active  = i === nextIncomplete();
+      return `
+        <div class="lmap-node" data-i="${i}" title="${L.title}">
+          <div class="lmap-pip ${done ? 'done' : active ? 'active' : ''}">${L.icon}</div>
+          <div class="lmap-label">${L.title.split(' ').slice(0,2).join(' ')}</div>
+        </div>`;
     }).join('');
 
-    // Button label
-    const anyDone = state.completedLessons.size > 0;
-    startBtn.textContent = anyDone ? 'Continue Learning →' : 'Start Learning →';
-  }
-
-  // ─── Desmos init ─────────────────────────────────────────────
-  function initCalculator() {
-    if (calc) { calc.destroy(); calc = null; }
-    const el = $('calculator');
-    calc = Desmos.GraphingCalculator(el, {
-      expressions:        true,
-      settingsMenu:       true,
-      zoomButtons:        true,
-      expressionsTopbar:  true,
-      border:             false,
-      lockViewport:       false,
-      language:           'en',
-      administerSecretFolders: false,
-      images:             true,
-      keypad:             false,
-    });
-    calc.updateSettings({ backgroundColor: '#0d0f1a' });
-  }
-
-  // ─── Load lesson into calculator ─────────────────────────────
-  function loadLessonCalc(lesson) {
-    calc.setBlank();
-    const exprs = lesson.initialExpressions || [];
-    exprs.forEach(expr => {
-      if (expr.type === 'table') {
-        calc.setExpression(expr);
-      } else {
-        calc.setExpression(expr);
-      }
-    });
-    calc.setMathBounds({ left: -6, right: 6, bottom: -4, top: 4 });
-  }
-
-  // ─── Render lesson ────────────────────────────────────────────
-  function renderLesson() {
-    const lesson = LESSONS[state.currentLesson];
-    const stepIdx = state.currentStep;
-    const step    = lesson.steps[stepIdx];
-
-    // Header
-    lessonNumber.textContent   = `Lesson ${lesson.id} of ${LESSONS.length}`;
-    lessonTitle.textContent    = lesson.title;
-    lessonSubtitle.textContent = lesson.subtitle;
-    lessonBread.textContent    = `${lesson.icon} ${lesson.title}`;
-    calcHintEl.textContent     = lesson.calcHint || '';
-    calcLabelEl.innerHTML      = `${lesson.icon || '📊'} ${lesson.title}`;
-
-    // Progress bar
-    const pct = ((state.completedLessons.size) / LESSONS.length) * 100;
-    progressFill.style.width = pct + '%';
-
-    // XP
-    xpBadge.textContent = `⭐ ${state.xp} XP`;
-
-    // Step tabs
-    stepTabs.innerHTML = lesson.steps.map((s, i) => {
-      const done    = i < stepIdx || (i === stepIdx && s.isQuiz && state.quizAnswered);
-      const active  = i === stepIdx;
-      return `<div class="step-tab ${active ? 'active' : ''} ${done ? 'done' : ''}" data-step="${i}">${s.label}</div>`;
-    }).join('');
-
-    stepTabs.querySelectorAll('.step-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        state.currentStep = +tab.dataset.step;
-        state.quizAnswered = false;
-        renderLesson();
-      });
+    map.querySelectorAll('.lmap-node').forEach(n => {
+      n.addEventListener('click', () => openLesson(+n.dataset.i));
     });
 
-    // Step content
-    if (step.isQuiz) {
-      stepContent.innerHTML = `
-        <h3>${step.title}</h3>
-        <p style="color: var(--muted); margin-bottom: 1rem;">Answer the question to complete this lesson.</p>
-      `;
-      stepActions.innerHTML = `<button class="btn-step btn-step-primary" id="take-quiz-btn">Take Quiz →</button>`;
-      $('take-quiz-btn').addEventListener('click', () => openQuiz(lesson, step.quiz));
-    } else {
-      stepContent.innerHTML = `<h3>${step.title}</h3>${step.content}`;
-      renderStepActions(lesson, stepIdx);
-    }
+    // CTA
+    const any = S.done.size > 0;
+    el('cta-label').textContent  = any ? 'Continue' : 'Begin Journey';
+    el('splash-meta').textContent = `${S.done.size}/${LESSONS.length} complete · ${S.xp} XP`;
   }
 
-  function renderStepActions(lesson, stepIdx) {
-    const isLast = stepIdx === lesson.steps.length - 1;
-    const isFirst = stepIdx === 0;
-    stepActions.innerHTML = '';
-
-    if (!isFirst) {
-      const prev = document.createElement('button');
-      prev.className = 'btn-step btn-step-secondary';
-      prev.textContent = '← Prev';
-      prev.addEventListener('click', () => {
-        state.currentStep--;
-        state.quizAnswered = false;
-        renderLesson();
-      });
-      stepActions.appendChild(prev);
-    }
-
-    const next = document.createElement('button');
-    next.className = 'btn-step btn-step-primary';
-    // If next step is quiz, say "Continue"
-    const nextStep = lesson.steps[stepIdx + 1];
-    next.textContent = isLast ? 'Complete Lesson 🎉' : nextStep && nextStep.isQuiz ? 'Continue →' : 'Next →';
-    next.addEventListener('click', () => {
-      if (isLast) {
-        completeLesson(lesson);
-      } else {
-        state.currentStep++;
-        state.quizAnswered = false;
-        renderLesson();
-      }
-    });
-    stepActions.appendChild(next);
+  function nextIncomplete() {
+    for (let i = 0; i < LESSONS.length; i++) if (!S.done.has(i)) return i;
+    return LESSONS.length - 1;
   }
 
-  // ─── Quiz ─────────────────────────────────────────────────────
-  function openQuiz(lesson, quiz) {
-    quizEmoji.textContent    = quiz.emoji;
-    quizQuestion.textContent = quiz.question;
-    quizFeedback.className   = 'quiz-feedback hidden';
-    quizFeedback.textContent = '';
+  // ─────────────────────────────────────────────
+  // BG CANVAS ANIMATION
+  // ─────────────────────────────────────────────
+  function initBg() {
+    const cv  = el('bg-canvas');
+    const ctx = cv.getContext('2d');
+    const fns = [
+      t => [Math.cos(t), Math.sin(t)],
+      t => [Math.cos(3*t)*Math.cos(t), Math.cos(3*t)*Math.sin(t)],
+      t => [Math.sin(3*t), Math.sin(2*t)],
+      t => [(1+Math.cos(t))*Math.cos(t), (1+Math.cos(t))*Math.sin(t)],
+      t => [Math.cos(2*t)*Math.cos(t), Math.cos(2*t)*Math.sin(t)],
+    ];
+    const colors = ['#6366f155','#a855f755','#22c55e44','#eab30844','#14b8a644'];
 
-    quizOptions.innerHTML = quiz.options.map((opt, i) =>
-      `<button class="quiz-opt" data-idx="${i}">${opt.text}</button>`
-    ).join('');
-
-    quizOptions.querySelectorAll('.quiz-opt').forEach(btn => {
-      btn.addEventListener('click', () => handleQuizAnswer(btn, quiz, lesson));
-    });
-
-    quizModal.classList.remove('hidden');
-  }
-
-  function handleQuizAnswer(btn, quiz, lesson) {
-    const idx = +btn.dataset.idx;
-    const opt = quiz.options[idx];
-    const allBtns = quizOptions.querySelectorAll('.quiz-opt');
-
-    allBtns.forEach(b => b.style.pointerEvents = 'none');
-
-    if (opt.correct) {
-      btn.classList.add('correct');
-      quizFeedback.textContent = '✅ ' + quiz.explanation;
-      quizFeedback.className   = 'quiz-feedback success';
-      state.quizAnswered = true;
-
-      setTimeout(() => {
-        quizModal.classList.add('hidden');
-        completeLesson(lesson);
-      }, 1800);
-    } else {
-      btn.classList.add('wrong');
-      // Show correct
-      allBtns.forEach(b => {
-        if (quiz.options[+b.dataset.idx].correct) b.classList.add('correct');
-      });
-      quizFeedback.textContent = '❌ Not quite. ' + quiz.explanation;
-      quizFeedback.className   = 'quiz-feedback error';
-
-      setTimeout(() => {
-        quizModal.classList.add('hidden');
-        completeLesson(lesson);
-      }, 2500);
-    }
-  }
-
-  // ─── Lesson complete ──────────────────────────────────────────
-  function completeLesson(lesson) {
-    const alreadyDone = state.completedLessons.has(state.currentLesson);
-    if (!alreadyDone) {
-      state.xp += lesson.xp;
-      state.completedLessons.add(state.currentLesson);
-    }
-
-    saveState();
-
-    const allDone = state.completedLessons.size === LESSONS.length;
-
-    celebIcon.textContent  = lesson.icon;
-    celebTitle.textContent = alreadyDone ? 'Revisited!' : 'Lesson Complete!';
-    celebMsg.textContent   = alreadyDone
-      ? `You've revisited "${lesson.title}". Keep exploring!`
-      : `You've mastered "${lesson.title}". Keep going!`;
-    xpEarned.textContent   = alreadyDone ? 'Already earned XP' : `+${lesson.xp} XP earned!`;
-    celebNext.textContent  = allDone ? 'See your results! 🏆' : 'Next Lesson →';
-
-    celebNext.onclick = () => {
-      celebModal.classList.add('hidden');
-      if (allDone) {
-        showGraduation();
-      } else {
-        // Go to next uncompleted lesson
-        let next = state.currentLesson + 1;
-        while (next < LESSONS.length && state.completedLessons.has(next)) next++;
-        if (next >= LESSONS.length) {
-          showGraduation();
-        } else {
-          state.currentLesson = next;
-          state.currentStep   = 0;
-          state.quizAnswered  = false;
-          loadLessonCalc(LESSONS[next]);
-          renderLesson();
-          celebModal.classList.add('hidden');
-        }
-      }
-    };
-
-    celebModal.classList.remove('hidden');
-    launchConfetti($('confetti-canvas'));
-  }
-
-  // ─── Graduation ───────────────────────────────────────────────
-  function showGraduation() {
-    lessonScreen.classList.remove('active');
-    gradScreen.classList.add('active');
-    gradScreen.classList.remove('hidden');
-
-    $('grad-stats').innerHTML = `
-      <div class="stat-pill"><div class="val">${state.completedLessons.size}</div><div class="lbl">Lessons</div></div>
-      <div class="stat-pill"><div class="val">${state.xp}</div><div class="lbl">XP Earned</div></div>
-      <div class="stat-pill"><div class="val">7</div><div class="lbl">Skills</div></div>
-    `;
-
-    launchConfetti($('grad-confetti'), 300);
-  }
-
-  // ─── Confetti ─────────────────────────────────────────────────
-  function launchConfetti(canvas, count = 80) {
-    if (!canvas) return;
-    const ctx  = canvas.getContext('2d');
-    const W    = canvas.offsetWidth || 460;
-    const H    = canvas.offsetHeight || 500;
-    canvas.width  = W;
-    canvas.height = H;
-
-    const colors = ['#4f6ef7','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4'];
-    const particles = Array.from({ length: count }, () => ({
-      x:  Math.random() * W,
-      y:  Math.random() * H - H,
-      r:  Math.random() * 6 + 3,
-      d:  Math.random() * count,
-      c:  colors[Math.floor(Math.random() * colors.length)],
-      t:  Math.random() * Math.PI * 2,
-      ts: (Math.random() - 0.5) * 0.1,
-      vy: Math.random() * 3 + 2,
-    }));
+    function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+    resize();
+    addEventListener('resize', resize);
 
     let frame = 0;
-    function draw() {
-      ctx.clearRect(0, 0, W, H);
-      particles.forEach(p => {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.t);
-        ctx.fillStyle = p.c;
-        ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r);
-        ctx.restore();
-        p.y  += p.vy;
-        p.t  += p.ts;
-        p.x  += Math.sin(p.d + frame / 20) * 1.5;
-        if (p.y > H + 10) { p.y = -10; p.x = Math.random() * W; }
-      });
-      frame++;
-      if (frame < 180) requestAnimationFrame(draw);
-      else ctx.clearRect(0, 0, W, H);
-    }
-    draw();
-  }
-
-  // ─── Splash canvas animation ──────────────────────────────────
-  function initSplashCanvas() {
-    const canvas = $('splash-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    function resize() {
-      canvas.width  = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    const equations = [
-      t => ({ x: Math.cos(t), y: Math.sin(t) }),
-      t => ({ x: Math.cos(3*t), y: Math.sin(2*t) }),
-      t => ({ x: (1+Math.cos(t))*Math.cos(t), y: (1+Math.cos(t))*Math.sin(t) }),
-      t => ({ x: Math.sin(5*t), y: Math.sin(4*t) }),
-      t => ({ x: Math.cos(2*t)*Math.cos(t), y: Math.cos(2*t)*Math.sin(t) }),
-    ];
-
-    const curves = equations.map((fn, i) => ({
-      fn,
-      phase: 0,
-      color: ['#4f6ef755','#8b5cf655','#10b98155','#f59e0b55','#06b6d455'][i],
-      scale: 80 + i * 20,
-      speed: 0.004 + i * 0.002,
-      ox: 0, oy: 0,
-    }));
-
-    let t = 0;
-    function drawFrame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const cx = canvas.width  / 2;
-      const cy = canvas.height / 2;
-
-      curves.forEach(c => {
+    (function draw() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const cx = cv.width/2, cy = cv.height/2;
+      fns.forEach((fn, fi) => {
+        const sc = Math.min(cx, cy) * (.35 + fi * .06);
         ctx.beginPath();
-        for (let i = 0; i <= 400; i++) {
-          const angle = (i / 400) * Math.PI * 2 * 3 + c.phase + t * c.speed * 100;
-          const pt = c.fn(angle);
-          const px = cx + pt.x * c.scale;
-          const py = cy + pt.y * c.scale;
-          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        for (let i = 0; i <= 500; i++) {
+          const t   = (i/500)*Math.PI*6 + frame*0.004*(1+fi*.3);
+          const [x,y] = fn(t);
+          i === 0 ? ctx.moveTo(cx+x*sc, cy+y*sc) : ctx.lineTo(cx+x*sc, cy+y*sc);
         }
-        ctx.strokeStyle = c.color;
-        ctx.lineWidth   = 1.5;
+        ctx.strokeStyle = colors[fi];
+        ctx.lineWidth   = 1.2;
         ctx.stroke();
       });
-
-      t++;
-      requestAnimationFrame(drawFrame);
-    }
-    drawFrame();
+      frame++;
+      requestAnimationFrame(draw);
+    })();
   }
 
-  // ─── Navigation ──────────────────────────────────────────────
-  function showLesson(idx) {
-    state.currentLesson = idx;
-    state.currentStep   = 0;
-    state.quizAnswered  = false;
+  // ─────────────────────────────────────────────
+  // CALCULATOR
+  // ─────────────────────────────────────────────
+  function initCalc() {
+    if (calc) { calc.destroy(); calc = null; }
+    calc = Desmos.GraphingCalculator(el('calculator'), {
+      expressions:       true,
+      settingsMenu:      true,
+      zoomButtons:       true,
+      expressionsTopbar: true,
+      border:            false,
+      language:          'en',
+    });
+    calc.updateSettings({ backgroundColor: '#08090f' });
+  }
 
-    splash.classList.remove('active');
-    lessonScreen.classList.add('active');
+  function loadCalc(lesson) {
+    calc.setBlank();
+    (lesson.initExprs || []).forEach(e => calc.setExpression(e));
+    calc.setMathBounds({ left:-7, right:7, bottom:-5, top:5 });
+  }
 
-    loadLessonCalc(LESSONS[idx]);
+  // ─────────────────────────────────────────────
+  // LESSON RENDERING
+  // ─────────────────────────────────────────────
+  function openLesson(idx) {
+    S.lesson     = idx;
+    S.step       = 0;
+    S.quizDone   = false;
+    showScreen('lesson');
+    loadCalc(LESSONS[idx]);
     renderLesson();
   }
 
-  function goBack() {
-    lessonScreen.classList.remove('active');
-    gradScreen.classList.remove('active');
-    gradScreen.classList.add('hidden');
-    splash.classList.add('active');
-    renderSplash();
+  function renderLesson() {
+    const L   = LESSONS[S.lesson];
+    const st  = L.steps[S.step];
+    const pct = (S.done.size / LESSONS.length) * 100;
+
+    // Topbar
+    el('progress-fill').style.width = pct + '%';
+    el('topbar-xp').textContent     = '⭐ ' + S.xp;
+
+    // Panel header
+    el('lesson-tag').textContent   = `Lesson ${L.id} of ${LESSONS.length}  ·  ${L.icon}`;
+    el('lesson-title').textContent = L.title;
+    el('lesson-sub').textContent   = L.sub;
+
+    // Calc label
+    el('calc-title').textContent = L.calcTitle || L.title;
+    el('calc-footer').textContent = L.calcHint || '';
+
+    // Step pills
+    el('step-nav').innerHTML = L.steps.map((s, i) => {
+      const done   = i < S.step || (i === S.step && S.quizDone);
+      const active = i === S.step;
+      return `<div class="step-pill ${active?'active':''} ${done?'done':''}" data-i="${i}">${s.label}</div>`;
+    }).join('');
+    el('step-nav').querySelectorAll('.step-pill').forEach(p =>
+      p.addEventListener('click', () => { S.step = +p.dataset.i; S.quizDone = false; renderLesson(); })
+    );
+
+    // Content
+    if (st.isQuiz) {
+      renderQuizStep(L, st);
+    } else {
+      el('panel-content').innerHTML = `<h3>${st.title}</h3>${st.body}`;
+      renderFooter(L);
+    }
   }
 
-  // ─── Bootstrap ───────────────────────────────────────────────
-  function init() {
-    loadState();
-    renderSplash();
-    initSplashCanvas();
-    initCalculator();
+  function renderQuizStep(L, st) {
+    el('panel-content').innerHTML = `
+      <h3>${st.title}</h3>
+      <p>Answer the question below to complete this lesson and earn your XP.</p>
+      <div class="challenge" style="margin-top:1rem">Click "Take Quiz" when you're ready.</div>
+    `;
+    el('panel-footer').innerHTML = '';
+    const btn = document.createElement('button');
+    btn.className   = 'btn-next';
+    btn.textContent = '🧠 Take Quiz';
+    btn.addEventListener('click', () => openQuiz(L, st.quiz));
+    el('panel-footer').appendChild(btn);
+  }
 
-    startBtn.addEventListener('click', () => {
-      // Resume from first uncompleted lesson
-      let target = 0;
-      for (let i = 0; i < LESSONS.length; i++) {
-        if (!state.completedLessons.has(i)) { target = i; break; }
-        if (i === LESSONS.length - 1) target = LESSONS.length - 1;
+  function renderFooter(L) {
+    const footer  = el('panel-footer');
+    footer.innerHTML = '';
+    const isFirst = S.step === 0;
+    const isLast  = S.step === L.steps.length - 1;
+
+    if (!isFirst) {
+      const prev = document.createElement('button');
+      prev.className   = 'btn-prev';
+      prev.textContent = '←';
+      prev.addEventListener('click', () => { S.step--; S.quizDone = false; renderLesson(); });
+      footer.appendChild(prev);
+    }
+
+    const next = document.createElement('button');
+    next.className = 'btn-next';
+    const nextSt   = L.steps[S.step + 1];
+    next.textContent = isLast
+      ? 'Finish Lesson 🎉'
+      : nextSt?.isQuiz ? 'Continue →' : 'Next →';
+    next.addEventListener('click', () => {
+      if (isLast) finishLesson(L);
+      else { S.step++; S.quizDone = false; renderLesson(); }
+    });
+    footer.appendChild(next);
+  }
+
+  // ─────────────────────────────────────────────
+  // QUIZ
+  // ─────────────────────────────────────────────
+  function openQuiz(L, quiz) {
+    const ov = el('overlay-quiz');
+    el('quiz-emo').textContent = quiz.emoji;
+    el('quiz-q').textContent   = quiz.question;
+    el('quiz-fb').className    = 'quiz-fb hidden';
+
+    el('quiz-opts').innerHTML = quiz.options.map((o, i) =>
+      `<button class="quiz-opt" data-i="${i}">${o.text}</button>`
+    ).join('');
+
+    el('quiz-opts').querySelectorAll('.quiz-opt').forEach(b =>
+      b.addEventListener('click', () => handleAnswer(b, L, quiz))
+    );
+
+    ov.classList.remove('hidden');
+  }
+
+  function handleAnswer(btn, L, quiz) {
+    const i   = +btn.dataset.i;
+    const ok  = quiz.options[i].correct;
+    const all = el('quiz-opts').querySelectorAll('.quiz-opt');
+    all.forEach(b => b.style.pointerEvents = 'none');
+
+    btn.classList.add(ok ? 'correct' : 'wrong');
+    if (!ok) all.forEach(b => { if (quiz.options[+b.dataset.i].correct) b.classList.add('correct'); });
+
+    const fb = el('quiz-fb');
+    fb.textContent = (ok ? '✅ ' : '❌ ') + quiz.explain;
+    fb.className   = 'quiz-fb ' + (ok ? 'ok' : 'bad');
+
+    setTimeout(() => {
+      el('overlay-quiz').classList.add('hidden');
+      S.quizDone = true;
+      finishLesson(L);
+    }, ok ? 1800 : 2600);
+  }
+
+  // ─────────────────────────────────────────────
+  // LESSON COMPLETE
+  // ─────────────────────────────────────────────
+  function finishLesson(L) {
+    const idx      = S.lesson;
+    const already  = S.done.has(idx);
+    if (!already) { S.xp += L.xp; S.done.add(idx); }
+    save();
+
+    const allDone = S.done.size === LESSONS.length;
+
+    // Win modal
+    el('win-icon').textContent  = L.icon;
+    el('win-title').textContent = already ? 'Revisited!' : 'Lesson Complete!';
+    el('win-msg').textContent   = already
+      ? `You revisited "${L.title}".`
+      : `"${L.title}" is now in your toolkit.`;
+    el('win-xp').textContent    = already ? 'XP already earned' : `+${L.xp} XP`;
+    el('btn-next').textContent  = allDone ? 'See Results 🏆' : 'Next Lesson →';
+
+    el('btn-next').onclick = () => {
+      el('overlay-win').classList.add('hidden');
+      if (allDone) {
+        showGrad();
+      } else {
+        const next = nextIncomplete();
+        openLesson(next);
       }
-      showLesson(target);
+    };
+
+    el('overlay-win').classList.remove('hidden');
+    confetti(el('win-canvas'), 70);
+  }
+
+  // ─────────────────────────────────────────────
+  // GRADUATION
+  // ─────────────────────────────────────────────
+  function showGrad() {
+    showScreen('grad');
+    el('grad-pills').innerHTML = `
+      <div class="gpill"><div class="v">${S.done.size}</div><div class="l">Lessons</div></div>
+      <div class="gpill"><div class="v">${S.xp}</div><div class="l">XP Earned</div></div>
+      <div class="gpill"><div class="v">7</div><div class="l">Skills</div></div>
+    `;
+    confetti(el('grad-canvas'), 250);
+  }
+
+  // ─────────────────────────────────────────────
+  // CONFETTI
+  // ─────────────────────────────────────────────
+  function confetti(cv, n) {
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    cv.width  = cv.offsetWidth  || 460;
+    cv.height = cv.offsetHeight || 500;
+    const cols = ['#6366f1','#a855f7','#22c55e','#eab308','#ef4444','#14b8a6','#f97316'];
+    const ps   = Array.from({length:n}, () => ({
+      x:  Math.random() * cv.width,
+      y:  Math.random() * cv.height - cv.height,
+      r:  Math.random() * 7 + 3,
+      c:  cols[Math.floor(Math.random()*cols.length)],
+      vy: Math.random() * 3 + 2,
+      vx: (Math.random() - .5) * 2,
+      rot: Math.random() * Math.PI * 2,
+      rs:  (Math.random() - .5) * .12,
+    }));
+    let f = 0;
+    (function draw() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ps.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(-p.r/2, -p.r/2, p.r, p.r * 1.6);
+        ctx.restore();
+        p.y   += p.vy;
+        p.x   += p.vx;
+        p.rot += p.rs;
+        if (p.y > cv.height + 10) { p.y = -10; p.x = Math.random() * cv.width; }
+      });
+      f++;
+      if (f < 220) requestAnimationFrame(draw);
+      else ctx.clearRect(0, 0, cv.width, cv.height);
+    })();
+  }
+
+  // ─────────────────────────────────────────────
+  // BOOTSTRAP
+  // ─────────────────────────────────────────────
+  function init() {
+    load();
+    showScreen('splash');
+    renderSplash();
+    initBg();
+    initCalc();
+
+    el('btn-start').addEventListener('click', () => openLesson(nextIncomplete()));
+
+    el('btn-back').addEventListener('click', () => {
+      showScreen('splash');
+      renderSplash();
     });
 
-    backBtn.addEventListener('click', goBack);
-
-    restartBtn.addEventListener('click', () => {
-      state.xp = 0;
-      state.completedLessons.clear();
-      state.currentLesson = 0;
-      state.currentStep   = 0;
-      saveState();
-      gradScreen.classList.remove('active');
-      gradScreen.classList.add('hidden');
-      splash.classList.add('active');
+    el('btn-restart').addEventListener('click', () => {
+      S.xp = 0; S.done.clear(); S.lesson = 0; S.step = 0;
+      save();
+      showScreen('splash');
       renderSplash();
     });
   }
